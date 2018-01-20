@@ -8,6 +8,27 @@ import java.util.List;
 import java.util.Random;
 
 public class Othello {
+	public static class Position {
+		public int row;
+		public int col;
+
+		public Position(int row, int col) {
+			this.row = row;
+			this.col = col;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (obj instanceof Position) {
+				Position target = (Position) obj;
+				if (target.row == row && target.col == col) {
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
 	private int[][] pad;
 	private final int[][] direction = { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 1, -1 }, { 0, -1 }, { -1, -1 }, { -1, 0 },
 			{ -1, 1 } };
@@ -29,23 +50,20 @@ public class Othello {
 		return true;
 	}
 
-	public List<int[]> getNextPos(int tern) {
-		List<int[]> result = new LinkedList<>();
+	public List<Position> getNextPos(int tern) {
+		List<Position> result = new LinkedList<>();
 
 		for (int i = 0; i < pad.length; i++) {
 			for (int j = 0; j < pad[i].length; j++) {
 				if (pad[i][j] == 0) {
 					for (int j2 = 0; j2 < direction.length; j2++) {
-						try {
-							int row = i + direction[j2][0];
-							int col = j + direction[j2][1];
-							if (pad[row][col] == -tern) {
-								if (reverseStone(i, j, tern, true) > 0) {
-									result.add(new int[] { i, j });
-									continue;
-								}
+						int row = i + direction[j2][0];
+						int col = j + direction[j2][1];
+						if (row < 0 || row >= pad.length || col < 0 || col >= pad[0].length || pad[row][col] == -tern) {
+							if (reverseStone(i, j, tern, true) > 0) {
+								result.add(new Position(i, j));
+								break;
 							}
-						} catch (ArrayIndexOutOfBoundsException e) {
 						}
 					}
 				}
@@ -97,7 +115,7 @@ public class Othello {
 	}
 
 	public void printPad() {
-		System.out.print("¡¡");
+		System.out.print("ã€€");
 		for (int i = 0; i < 8; i++) {
 			System.out.print((char) (0xFF41 + i));
 		}
@@ -106,12 +124,12 @@ public class Othello {
 		for (int i = 0; i < pad.length; i++) {
 			System.out.print((char) (0xFF11 + i));
 			for (int j = 0; j < pad[i].length; j++) {
-				System.out.print(pad[i][j] == 0 ? "¡¡" : pad[i][j] < 0 ? "¡Ü" : "¡Û");
+				System.out.print(pad[i][j] == 0 ? "ã€€" : pad[i][j] < 0 ? "â—" : "â—‹");
 			}
 			System.out.println((char) (0xFF11 + i));
 		}
 
-		System.out.print("¡¡");
+		System.out.print("ã€€");
 		for (int i = 0; i < 8; i++) {
 			System.out.print((char) (0xFF41 + i));
 		}
@@ -120,49 +138,65 @@ public class Othello {
 
 	public static void main(String[] args) throws IOException {
 		int tern = -1;
+		int last_tern = 1;
 		Othello othello = new Othello();
 		othello.init();
 
 		Random r = new Random();
 
 		try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
-			while (true) {
+			while (!othello.isFinished()) {
 				othello.printPad();
 
-				if (tern == -1) {
-					List<int[]> l = othello.getNextPos(tern);
-					for (int[] is : l) {
-						System.out.print("[" + (is[0] + 1) + ", " + (char) (is[1] + 'a') + "]\t");
-					}
-					String input = br.readLine();
+				List<Position> l = othello.getNextPos(tern);
 
-					if (input.trim().length() == 0)
-						continue;
-					if (input.trim().substring(0, 1).equalsIgnoreCase("Q"))
-						break;
-					if (!input.matches("[1-8][a-hA-H]") && !input.matches("[a-hA-H][1-8]"))
-						continue;
+				if (l.size() > 0) {
+					if (tern == -1) {
+						for (Position is : l) {
+							System.out.print("[" + (is.row + 1) + ", " + (char) (is.col + 'a') + "]\t");
+						}
+						String input = br.readLine();
 
-					int pos1 = -1;
-					int pos2 = -1;
-					if (input.charAt(0) > '0' && input.charAt(0) < '9') {
-						pos1 = input.charAt(0) - '1';
-						pos2 = input.toLowerCase().charAt(1) - 'a';
+						if (input.trim().length() == 0)
+							continue;
+						if (input.trim().substring(0, 1).equalsIgnoreCase("Q"))
+							break;
+						if (!input.matches("[1-8][a-hA-H]") && !input.matches("[a-hA-H][1-8]"))
+							continue;
+
+						int row = -1;
+						int col = -1;
+						if (input.charAt(0) > '0' && input.charAt(0) < '9') {
+							row = input.charAt(0) - '1';
+							col = input.toLowerCase().charAt(1) - 'a';
+						} else {
+							row = input.charAt(1) - '1';
+							col = input.toLowerCase().charAt(0) - 'a';
+						}
+
+						if (!l.contains(new Position(row, col)))
+							continue;
+
+						if (!othello.setStone(row, col, tern))
+							continue;
 					} else {
-						pos1 = input.charAt(1) - '1';
-						pos2 = input.toLowerCase().charAt(0) - 'a';
+						Position point = l.get(r.nextInt(l.size()));
+						System.out.println(point);
+						if (!othello.setStone(point.row, point.col, tern))
+							continue;
 					}
-					if (!othello.setStone(pos1, pos2, tern))
-						continue;
-				} else {
-					int pos1 = r.nextInt(8);
-					int pos2 = r.nextInt(8);
-					if (!othello.setStone(pos1, pos2, tern))
-						continue;
+					last_tern = tern;
+				} else if (last_tern == tern) {
+					break;
 				}
 
 				tern = -tern;
 			}
 		}
+	}
+
+	private boolean isFinished() {
+
+		return false;
 	}
 }
