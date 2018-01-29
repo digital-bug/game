@@ -21,9 +21,6 @@ public class Othello {
 
 	/**
 	 * 게임에 사용되는 좌표 행렬의 좌표 (0 to 7) 및 코드(Row is 1 to 8 and column is a to h)
-	 * 
-	 * @author home
-	 *
 	 */
 	private static class Point {
 		public int row;
@@ -86,17 +83,17 @@ public class Othello {
 	}
 
 	public boolean setStone(int row, int col, int tern) {
-		if (tern == -1) {
-			blackChain.add(new Point(row, col));
-		} else {
-			whiteChain.add(new Point(row, col));
-		}
 		if (pad[row][col] != 0)
 			return false;
 		if (reverseStone(row, col, tern, true) == 0)
 			return false;
 		pad[row][col] = tern;
 		reverseStone(row, col, tern, false);
+		if (tern == -1) {
+			blackChain.add(new Point(row, col));
+		} else {
+			whiteChain.add(new Point(row, col));
+		}
 		return true;
 	}
 
@@ -113,9 +110,10 @@ public class Othello {
 					for (int j2 = 0; j2 < direction.length; j2++) {
 						int row = i + direction[j2][0];
 						int col = j + direction[j2][1];
-						if (row < 0 || row >= pad.length || col < 0 || col >= pad[0].length || pad[row][col] == -tern) {
+						if (row >= 0 && row < pad.length && col >= 0 && col < pad[0].length && pad[row][col] == -tern) {
 							if (reverseStone(i, j, tern, true) > 0) {
 								result.add(new Point(i, j));
+								pad[i][j] = tern * 2;
 								break;
 							}
 						}
@@ -140,7 +138,7 @@ public class Othello {
 				tmpRow += direction[i][0];
 				tmpCol += direction[i][1];
 				if (tmpRow < 0 || tmpRow >= pad.length || tmpCol < 0 || tmpCol >= pad[0].length
-						|| pad[tmpRow][tmpCol] == 0)
+						|| (pad[tmpRow][tmpCol] != -1 && pad[tmpRow][tmpCol] != 1))
 					break;
 				if (!isCapture && tern != pad[tmpRow][tmpCol]) {
 					isCapture = true;
@@ -178,7 +176,26 @@ public class Othello {
 		for (int i = 0; i < pad.length; i++) {
 			System.out.print((char) (0xFF11 + i));
 			for (int j = 0; j < pad[i].length; j++) {
-				System.out.print(pad[i][j] == 0 ? "　" : pad[i][j] < 0 ? "●" : "○");
+				switch (pad[i][j]) {
+				case 1:
+					System.out.print("○");
+					break;
+				case -1:
+					System.out.print("●");
+					break;
+				case 2:
+					System.out.print("☆");
+					pad[i][j] = 0;
+					break;
+				case -2:
+					System.out.print("★");
+					pad[i][j] = 0;
+					break;
+				default:
+					System.out.print("　");
+					break;
+				}
+
 			}
 			System.out.println((char) (0xFF11 + i));
 		}
@@ -220,7 +237,47 @@ public class Othello {
 		return false;
 	}
 
-	public static void main(String[] args) throws IOException {
+	public static int[][] resizeWeightRange(int[][] weight) {
+		double min = Double.MAX_VALUE;
+		double max = Double.MIN_VALUE;
+
+		int[][] result = new int[8][8];
+
+		for (int i = 0; i < weight.length; i++) {
+			for (int j = 0; j < weight[i].length; j++) {
+				if ((i == 3 || i == 4) && (j == 3 || j == 4))
+					continue;
+				min = Double.min(min, weight[i][j]);
+				max = Double.max(max, weight[i][j]);
+			}
+		}
+
+		double gap = max - min + 1;
+		for (int i = 0; i < weight.length; i++) {
+			for (int j = 0; j < weight[i].length; j++) {
+				if ((i == 3 || i == 4) && (j == 3 || j == 4))
+					continue;
+				result[i][j] = (int) (((double) weight[i][j] - min) * 19.0 / gap + 1.0);
+			}
+		}
+
+		return result;
+	}
+
+	private void clearNextPos() {
+		for (int i = 0; i < pad.length; i++) {
+			for (int j = 0; j < pad[i].length; j++) {
+				switch (pad[i][j]) {
+				case 2:
+					pad[i][j] = 0;
+				case -2:
+					pad[i][j] = 0;
+				}
+			}
+		}
+	}
+
+	public static void main(String[] args) throws Exception {
 		int[][] weight = new int[8][8];
 
 		try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream("othello_win_weight.map"))) {
@@ -239,7 +296,7 @@ public class Othello {
 		int whiteWinCnt = 0;
 		int drawCnt = 0;
 
-		for (int x = 0; x < 1000; x++) {
+		for (int x = 0; x < 10000; x++) {
 
 			int tern = -1;
 			int last_tern = 1;
@@ -248,78 +305,28 @@ public class Othello {
 
 			Random r = new Random();
 
+			int[][] resizingWeight = resizeWeightRange(weight);
+
 			try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
 				while (!othello.isFinished()) {
-					// try {
-					// othello.printPad();
-
-					// System.out.println(">> tern: " + tern);
-
 					List<Point> l = othello.getNextPos(tern);
+
+					othello.printPad();
+					othello.clearNextPos();
+
+					System.out.println(">> tern: " + tern);
 
 					if (l.size() > 0) {
 						if (tern == -1) {
-							// for (Position is : l) {
-							// System.out.print(is.toFormatedString() + "\t");
-							// }
-							// String input = br.readLine();
-							//
-							// if (input.trim().length() == 0)
-							// continue;
-							// if (input.trim().substring(0, 1).equalsIgnoreCase("Q"))
-							// break;
-							//
-							// Position p = new Position(input);
-							// if (!l.contains(p))
-							// continue;
-							//
-							// if (!othello.setStone(p, tern))
-							// continue;
-							// List<Integer> weightList = new ArrayList<>(l.size());
-							// int tot = 0;
-							// for (Point p : l) {
-							// tot += weight[p.row][p.col];
-							// weightList.add(tot);
-							// }
-							// int total = weightList.get(weightList.size() - 1);
-							//
-							// int rnd = r.nextInt(total);
-							//
-							// int size = weightList.size();
-							// int idx;
-							// for (idx = 0; idx < size; idx++) {
-							// if (rnd < weightList.get(idx))
-							// break;
-							// }
-							// // System.out.println(idx + " / " + weightList.size());
-							//
-							// Point point = l.get(idx);
-							Point point = l.get(r.nextInt(l.size()));
-							// System.out.println(point);
+							Point point = getNextPosFromInput(l, br);
+
+							// Point point = getNextPosWithWeight(resizingWeight, l, r);
+							// Point point = getNextPos(l, r);
 							if (!othello.setStone(point.row, point.col, tern))
 								continue;
 						} else {
-							// List<Integer> weightList = new ArrayList<>(l.size());
-							// int tot = 0;
-							// for (Point p : l) {
-							// tot += weight[p.row][p.col];
-							// weightList.add(tot);
-							// }
-							// int total = weightList.get(weightList.size() - 1);
-							//
-							// int rnd = r.nextInt(total);
-							//
-							// int size = weightList.size();
-							// int idx;
-							// for (idx = 0; idx < size; idx++) {
-							// if (rnd < weightList.get(idx))
-							// break;
-							// }
-							// // System.out.println(idx + " / " + weightList.size());
-							//
-							// Point point = l.get(idx);
-							Point point = l.get(r.nextInt(l.size()));
-							// System.out.println(point);
+							Point point = getNextPosWithWeight(resizingWeight, l, r);
+							// Point point = getNextPos(l, r);
 							if (!othello.setStone(point.row, point.col, tern))
 								continue;
 						}
@@ -329,15 +336,13 @@ public class Othello {
 					}
 
 					tern = -tern;
-					// } catch (FotmatErrorException e) {
-					// }
 				}
 			}
 			switch (othello.checkWinner()) {
 			case -1:
-				System.out.println("Black Win.");
+				// System.out.println("Black Win.");
 				for (Point p : othello.blackChain) {
-					weight[p.row][p.col] += 2;
+					weight[p.row][p.col]++;
 				}
 				for (Point p : othello.whiteChain) {
 					weight[p.row][p.col]--;
@@ -345,13 +350,13 @@ public class Othello {
 				blackWinCnt++;
 				break;
 			case 0:
-				System.out.println("Draw.");
+				// System.out.println("Draw.");
 				drawCnt++;
 				break;
 			case 1:
-				System.out.println("White Win.");
+				// System.out.println("White Win.");
 				for (Point p : othello.whiteChain) {
-					weight[p.row][p.col] += 2;
+					weight[p.row][p.col]++;
 				}
 				for (Point p : othello.blackChain) {
 					weight[p.row][p.col]--;
@@ -359,29 +364,13 @@ public class Othello {
 				whiteWinCnt++;
 				break;
 			}
-			double min = Double.MAX_VALUE;
-			double max = Double.MIN_VALUE;
-			for (int i = 0; i < weight.length; i++) {
-				for (int j = 0; j < weight[i].length; j++) {
-					if ((i == 3 || i == 4) && (j == 3 || j == 4))
-						continue;
-					min = Double.min(min, weight[i][j]);
-					max = Double.max(max, weight[i][j]);
-				}
-			}
+			// for (int i = 0; i < weight.length; i++) {
+			// System.out.println(Arrays.toString(weight[i]));
+			// }
+		}
 
-			System.out.println(max + " / " + min);
-
-			for (int i = 0; i < weight.length; i++) {
-				for (int j = 0; j < weight[i].length; j++) {
-					if ((i == 3 || i == 4) && (j == 3 || j == 4))
-						continue;
-					weight[i][j] = (int) (((double) weight[i][j] - min) * 10000.0 / (max - min) + 1.0);
-				}
-			}
-			for (int i = 0; i < weight.length; i++) {
-				System.out.println(Arrays.toString(weight[i]));
-			}
+		for (int i = 0; i < weight.length; i++) {
+			System.out.println(Arrays.toString(weight[i]));
 		}
 
 		ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("othello_win_weight.map"));
@@ -389,5 +378,53 @@ public class Othello {
 		oos.close();
 
 		System.out.println("Black: " + blackWinCnt + ", Draw: " + drawCnt + ", white: " + whiteWinCnt);
+	}
+
+	private static Point getNextPosFromInput(List<Point> l, BufferedReader br) throws Exception {
+		while (true) {
+			for (Point is : l) {
+				System.out.print(is.toFormatedString() + "\t");
+			}
+			try {
+				String input = br.readLine();
+				if (input.trim().length() == 0)
+					continue;
+				if (input.trim().substring(0, 1).equalsIgnoreCase("Q"))
+					throw new Exception("종료!");
+				Point p = new Point(input);
+				if (l.contains(p)) {
+					return p;
+				}
+			} catch (FotmatErrorException | IOException e) {
+			}
+			System.out.println("다시 입력하세요.");
+			continue;
+		}
+	}
+
+	private static Point getNextPos(List<Point> l, Random r) {
+		return l.get(r.nextInt(l.size()));
+	}
+
+	private static Point getNextPosWithWeight(int[][] resizingWeight, List<Point> l, Random r) {
+		List<Integer> weightList = new ArrayList<>(l.size());
+
+		int tot = 0;
+		for (Point p : l) {
+			tot += resizingWeight[p.row][p.col];
+			weightList.add(tot);
+		}
+		int total = weightList.get(weightList.size() - 1);
+
+		int rnd = r.nextInt(total);
+
+		int size = weightList.size();
+		int idx;
+		for (idx = 0; idx < size; idx++) {
+			if (rnd < weightList.get(idx))
+				break;
+		}
+
+		return l.get(idx);
 	}
 }
